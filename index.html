@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spinning Wheel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f6f2eb;
+      --ink: #111111;
+      --paper: rgba(255,255,255,0.55);
+      --line: rgba(17,17,17,0.12);
+      --accent: #111111;
+      --shadow: 0 20px 60px rgba(0,0,0,0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.9), transparent 30%),
+        radial-gradient(circle at 80% 30%, rgba(255,210,170,0.35), transparent 25%),
+        linear-gradient(180deg, #f8f4ee 0%, #efe7dc 100%);
+      color: var(--ink);
+      font-family: "Space Grotesk", sans-serif;
+      padding: 24px;
+    }
+
+    .app {
+      width: min(92vw, 760px);
+      display: grid;
+      gap: 24px;
+      justify-items: center;
+      animation: reveal 0.8s ease both;
+    }
+
+    .title-wrap {
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: "Bebas Neue", cursive;
+      font-size: clamp(3rem, 8vw, 5.5rem);
+      line-height: 0.95;
+      letter-spacing: 0.04em;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      font-size: 0.98rem;
+      opacity: 0.72;
+      animation: reveal 0.8s ease both 0.12s;
+    }
+
+    .wheel-shell {
+      position: relative;
+      width: 100%;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 32px;
+      background: var(--paper);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+      overflow: visible;
+      animation: reveal 0.8s ease both 0.2s;
+    }
+
+    canvas {
+      width: min(82vw, 420px);
+      height: min(82vw, 420px);
+      max-width: 420px;
+      max-height: 420px;
+      display: block;
+      filter: drop-shadow(0 18px 30px rgba(0,0,0,0.15));
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 14px;
+      animation: reveal 0.8s ease both 0.32s;
+    }
+
+    button {
+      appearance: none;
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 14px 22px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+      box-shadow: 0 12px 24px rgba(17,17,17,0.18);
+    }
+
+    button:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 16px 30px rgba(17,17,17,0.24);
+    }
+
+    button:active {
+      transform: translateY(0) scale(0.98);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #result {
+      min-height: 1.5em;
+      margin: 0;
+      font-size: clamp(1.1rem, 2vw, 1.35rem);
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      animation: reveal 0.8s ease both 0.4s;
+    }
+
+    .hint {
+      font-size: 0.9rem;
+      opacity: 0.6;
+      text-align: center;
+      max-width: 46ch;
+    }
+
+    @keyframes reveal {
+      from {
+        opacity: 0;
+        transform: translateY(18px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 520px) {
+      .wheel-shell {
+        padding: 18px;
+        border-radius: 24px;
+      }
+
+      button {
+        width: 100%;
+        max-width: 240px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="title-wrap">
+      <h1>Spinning Wheel</h1>
+    </header>
+
+    <section class="wheel-shell">
+      <canvas id="wheelCanvas" width="420" height="420" aria-label="Spinning wheel"></canvas>
+    </section>
+
+    <section class="controls">
+      <button id="spinButton" type="button">Spin</button>
+      <p id="result" aria-live="polite"></p>
+    </section>
+
+    <p class="hint">Testi Hyrrä.</p>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    const spinButton = document.getElementById('spinButton');
+    const resultText = document.getElementById('result');
+
+    const segments = 8;
+    const colors = [
+      '#f94144',
+      '#277da1',
+      '#90be6d',
+      '#f9c74f',
+      '#f3722c',
+      '#6a4c93',
+      '#43bccd',
+      '#f15bb5'
+    ];
+    const segmentLabels = ['1', '2', '3', '4', '5', '6', '7', '8'];
+
+    let currentAngle = 0;
+    let spinning = false;
+    let animationFrame = null;
+
+    function drawWheel(angle) {
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = Math.min(centerX, centerY) - 24;
+      const segmentAngle = (2 * Math.PI) / segments;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Wheel base
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius + 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#111';
+      ctx.fill();
+      ctx.restore();
+
+      // Draw segments
+     for (let i = 0; i < segments; i++) {
+    const startAngle = angle - Math.PI / 2 + i * segmentAngle;
+    const endAngle = startAngle + segmentAngle;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(17,17,17,0.7)';
+    ctx.stroke();
+
+    // Labels
+    const labelAngle = startAngle + segmentAngle / 2;
+    const labelRadius = radius * 0.72;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(labelAngle);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#111';
+    ctx.font = '700 28px "Space Grotesk"';
+    ctx.fillText(segmentLabels[i], labelRadius, 0);
+    ctx.restore();
+}
+
+
+      // Center cap
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 22, 0, Math.PI * 2);
+      ctx.fillStyle = '#111';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+
+      // Pointer at top
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY - radius - 4);
+      ctx.lineTo(centerX - 16, centerY - radius - 34);
+      ctx.lineTo(centerX + 16, centerY - radius - 34);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+function getLandedSegmentIndex(angle) {
+  const segmentAngle = (2 * Math.PI) / segments;
+
+  // Normalize so angle = 0 → segment 0 at the pointer (top)
+  const normalized = (-angle + 2 * Math.PI) % (2 * Math.PI);
+
+  const index = Math.floor(normalized / segmentAngle) % segments;
+  return index;
+}
+
+
+
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+function spin() {
+  if (spinning) return;
+
+  spinning = true;
+  spinButton.disabled = true;
+  resultText.textContent = '';
+
+  const segmentAngle = (2 * Math.PI) / segments;
+  const extraSpins = 5 + Math.floor(Math.random() * 3);
+
+  // Random final offset within one full turn
+  const randomOffset = Math.random() * 2 * Math.PI;
+
+  const finalAngle = extraSpins * 2 * Math.PI + randomOffset;
+
+  const startAngle = currentAngle;
+  const duration = 4200;
+  const startTime = performance.now();
+
+  function animate(now) {
+    const elapsed = now - startTime;
+    const t = Math.min(elapsed / duration, 1);
+    const eased = easeOutCubic(t);
+
+    currentAngle = startAngle + (finalAngle - startAngle) * eased;
+    drawWheel(currentAngle);
+
+    if (t < 1) {
+      animationFrame = requestAnimationFrame(animate);
+    } else {
+      spinning = false;
+      spinButton.disabled = false;
+
+      // Lock final angle
+      currentAngle = finalAngle % (2 * Math.PI);
+      drawWheel(currentAngle);
+
+      // ✅ Compute which segment is under the pointer
+      const landedSegment = getLandedSegmentIndex(currentAngle);
+      resultText.textContent = `You landed on segment ${segmentLabels[landedSegment]}!`;
+    }
+  }
+
+  cancelAnimationFrame(animationFrame);
+  animationFrame = requestAnimationFrame(animate);
+}
+
+
+
+    drawWheel(currentAngle);
+    spinButton.addEventListener('click', spin);
+  </script>
+</body>
+</html>
